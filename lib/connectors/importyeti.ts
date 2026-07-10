@@ -29,6 +29,14 @@ const CACHE_NS = "importyeti";
 const CACHE_TTL = 1000 * 60 * 60 * 24 * 30; // 30 days — conserve metered credits
 const IY = "https://www.importyeti.com";
 
+interface SearchItem {
+  title?: string;
+  type?: string;
+  countryCode?: string;
+  totalShipments?: number;
+  key?: string; // e.g. "company/tesla"
+}
+
 interface Supplier {
   supplier_name?: string;
   supplier_address_country?: string;
@@ -80,17 +88,42 @@ function parseKey(k: string): { iso: string; month: number } | null {
   return { iso: `${m[3]}-${m[2]}-${m[1]}`, month: parseInt(m[2], 10) - 1 };
 }
 
-async function fetchProfile(slug: string, key: string, signal: AbortSignal): Promise<IYData | null> {
-  const cached = getCached<IYData>(CACHE_NS, slug, CACHE_TTL);
+/** Search-resolve the best-matching company key (what the ImportYeti site autocomplete does). */
+async function resolveKey(term: string, key: string, signal: AbortSignal): Promise<{ slug: string; title?: string } | null> {
+  const res = await getJson<{ data?: SearchItem[] }>(
+    `https://data.importyeti.com/v1.0/company/search?name=${encodeURIComponent(term)}&page_size=8`,
+    { signal, headers: { IYApiKey: key }, timeoutMs: 15_000 }
+  );
+  const comps = (res.data ?? []).filter((r) => r.type === "company" && r.key);
+  if (comps.length === 0) return null;
+  const t = term.toLowerCase().trim();
+  const exact = comps.filter((c) => (c.title ?? "").toLowerCase().trim() === t);
+  const starts = comps.filter((c) => (c.title ?? "").toLowerCase().startsWith(t));
+  const pool = exact.length ? exact : starts.length ? starts : comps;
+  const best = pool.sort((a, b) => (b.totalShipments ?? 0) - (a.totalShipments ?? 0))[0];
+  return { slug: (best.key ?? "").replace(/^company\//, ""), title: best.title };
+}
+
+/** Resolve + fetch a company's import profile, cached per ticker (search + lookup both metered). */
+async function resolveProfile(
+  ticker: string,
+  term: string,
+  key: string,
+  signal: AbortSignal
+): Promise<{ slug: string; data: IYData } | null> {
+  const cached = getCached<{ slug: string; data: IYData }>(CACHE_NS, ticker, CACHE_TTL);
   if (cached) return cached;
-  const res = await getJson<{ data?: IYData }>(`https://data.importyeti.com/v1.0/company/${encodeURIComponent(slug)}`, {
-    signal,
-    headers: { IYApiKey: key },
-    timeoutMs: 15_000,
-  });
+  const resolved = await resolveKey(term, key, signal);
+  if (!resolved?.slug) return null;
+  const res = await getJson<{ data?: IYData }>(
+    `https://data.importyeti.com/v1.0/company/${encodeURIComponent(resolved.slug)}`,
+    { signal, headers: { IYApiKey: key }, timeoutMs: 15_000 }
+  );
   const data = res.data ?? null;
-  if (data) setCached(CACHE_NS, slug, data);
-  return data;
+  if (!data) return null;
+  const out = { slug: resolved.slug, data };
+  setCached(CACHE_NS, ticker, out);
+  return out;
 }
 
 export const importYetiConnector: Connector = {
@@ -100,26 +133,31 @@ export const importYetiConnector: Connector = {
   requiredIdentifiers: [],
   async fetch(entity, ctx) {
     const start = Date.now();
-    const slug = entity.identifiers.importYetiSlug || slugify(entity.companyName);
-    const link = { label: "Open ImportYeti profile", url: `${IY}/company/${slug}` };
+    // Search with the cleaned brand term — "Tesla, Inc." returns junk, "Tesla" resolves the real entity.
+    const term =
+      entity.identifiers.brandTerms?.[0]?.trim() ||
+      entity.companyName.replace(/,?\s*(inc|corp|corporation|ltd|plc|co|holdings|group)\.?$/i, "").trim();
+    const searchLink = { label: "Search on ImportYeti", url: `${IY}/search?q=${encodeURIComponent(term)}` };
     const key = process.env.IMPORTYETI_API_KEY;
 
     if (!key) {
       return result(meta, {
         status: "no-data",
         note: "Set IMPORTYETI_API_KEY to load the import profile. Link-out still available.",
-        primaryLink: link,
+        primaryLink: { label: "Open ImportYeti profile", url: `${IY}/company/${slugify(entity.companyName)}` },
         tookMs: Date.now() - start,
       });
     }
 
     try {
-      const data = await fetchProfile(slug, key, ctx.signal);
+      const resolved = await resolveProfile(entity.ticker, term, key, ctx.signal);
+      const data = resolved?.data;
+      const link = resolved ? { label: "Open ImportYeti profile", url: `${IY}/company/${resolved.slug}` } : searchLink;
       if (!data || !data.total_shipments) {
         return result(meta, {
           status: "no-data",
-          note: `No U.S. import records found for "${entity.companyName}" (they may import under a different consignee name).`,
-          primaryLink: link,
+          note: `No U.S. import records matched "${term}" (the company may import under a different consignee name).`,
+          primaryLink: searchLink,
           tookMs: Date.now() - start,
         });
       }
@@ -141,7 +179,9 @@ export const importYetiConnector: Connector = {
         if (prior12 > 0) yoy = ((last12 - prior12) / prior12) * 100;
       }
 
-      const suppliers = (data.suppliers_table ?? []).slice(0, 12);
+      // ImportYeti marks confidential/redacted shipments with a placeholder "supplier" — drop it.
+      const isReal = (n?: string) => !!n && !/missing in source|confidential|^n\/?a$|^unknown$/i.test(n);
+      const suppliers = (data.suppliers_table ?? []).filter((s) => isReal(s.supplier_name)).slice(0, 12);
       const topSupplier = suppliers[0];
       const hs = (data.hs_codes ?? []).slice().sort((a, b) => (b.shipments ?? 0) - (a.shipments ?? 0));
       const lanes = (data.lane_permutations ?? []).slice().sort((a, b) => (b.shipments ?? 0) - (a.shipments ?? 0)).slice(0, 8);
@@ -237,8 +277,8 @@ export const importYetiConnector: Connector = {
       const f = classifyFailure(e);
       return result(meta, {
         ...f,
-        note: f.status === "no-data" ? `No ImportYeti profile matched "${entity.companyName}". Link-out still available.` : f.note,
-        primaryLink: link,
+        note: f.status === "no-data" ? `No ImportYeti profile matched "${term}". Link-out still available.` : f.note,
+        primaryLink: searchLink,
         tookMs: Date.now() - start,
       });
     }
