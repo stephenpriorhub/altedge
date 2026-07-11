@@ -98,6 +98,7 @@ export const realEstateConnector: Connector = {
   enabled: true,
   description: "Owned/leased facilities, land and expansion signals from the company's SEC 10-K Properties section.",
   requiredIdentifiers: [],
+  timeoutMs: 45_000, // 10-K fetch + Claude summary needs more than the default 18s
   async fetch(entity, ctx) {
     const start = Date.now();
     if (!entity.cik) return result(meta, { status: "not-applicable", note: "No SEC CIK — not an SEC registrant." });

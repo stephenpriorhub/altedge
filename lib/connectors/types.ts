@@ -128,6 +128,8 @@ export interface Connector {
   description: string;
   /** Identifiers that must be present for this connector to run. */
   requiredIdentifiers: (keyof EntityIdentifiers)[];
+  /** Optional per-connector timeout override (ms). LLM-backed connectors need more than the default. */
+  timeoutMs?: number;
   fetch(entity: ResolvedEntity, ctx: FetchCtx): Promise<SignalResult>;
 }
 

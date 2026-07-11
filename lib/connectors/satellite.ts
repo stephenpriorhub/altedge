@@ -65,6 +65,7 @@ export const satelliteConnector: Connector = {
   enabled: true,
   description: "Company-specific ideas for evaluating the business from satellite imagery (Planet), each with a site address and map link.",
   requiredIdentifiers: [],
+  timeoutMs: 45_000, // Claude idea-generation needs more than the default 18s
   async fetch(entity, ctx) {
     const start = Date.now();
     const planetReady = !!process.env.PLANET_API_KEY;
@@ -148,7 +149,14 @@ export const satelliteConnector: Connector = {
         tookMs: Date.now() - start,
       });
     } catch (e) {
-      return result(meta, { status: "error", error: e instanceof Error ? e.message : String(e), tookMs: Date.now() - start });
+      const msg = e instanceof Error ? e.message : String(e);
+      const aborted = /abort|timed?\s?out/i.test(msg);
+      return result(meta, {
+        status: aborted ? "no-data" : "error",
+        note: aborted ? "Idea generation timed out — re-scan to retry (results cache once generated)." : undefined,
+        error: aborted ? undefined : msg,
+        tookMs: Date.now() - start,
+      });
     }
   },
 };

@@ -61,7 +61,7 @@ export function eligibleConnectors(entity: ResolvedEntity): Connector[] {
  */
 async function runOne(c: Connector, entity: ResolvedEntity): Promise<SignalResult> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CONNECTOR_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), c.timeoutMs ?? CONNECTOR_TIMEOUT_MS);
   const start = Date.now();
   try {
     return await c.fetch(entity, { signal: controller.signal, now: new Date() });
