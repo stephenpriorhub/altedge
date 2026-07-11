@@ -18,12 +18,14 @@ import { webConnector } from "./web";
 import { trendsConnector } from "./trends";
 import { appsConnector } from "./apps";
 import { importYetiConnector } from "./importyeti";
+import { workforceConnector } from "./workforce";
 import { stubConnectors } from "./stubs";
 
 export const CONNECTORS: Connector[] = [
   githubConnector,
   filingsConnector,
   jobsConnector,
+  workforceConnector,
   trendsConnector,
   webConnector,
   appsConnector,

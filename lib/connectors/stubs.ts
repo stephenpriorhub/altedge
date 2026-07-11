@@ -55,11 +55,11 @@ export const stubConnectors: Connector[] = [
     description: "Android install & rating momentum. No free official API — needs a third-party provider.",
   }),
   lockedConnector({
-    id: "coresignal",
-    label: "Workforce Depth",
+    id: "revelio",
+    label: "Attrition & Flows",
     category: "hiring",
     tier: "premium",
-    description: "Headcount trend, attrition and role-level detail beyond public boards. Requires Coresignal / Revelio.",
+    description: "Employee inflows/outflows and attrition by role & geo (beyond headcount level). Requires Revelio Labs.",
   }),
 
   // ── Roadmap: expensive + hard to make defensible; deprioritized in v1 ──
