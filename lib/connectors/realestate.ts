@@ -18,10 +18,20 @@ const meta = { id: "realestate", label: "Real Estate / Properties", category: "r
 
 interface Facility {
   location: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
   purpose: string;
   tenure: string; // owned | leased | mixed | unknown
   size?: string;
 }
+
+const mapsLink = (lat?: number, lng?: number, address?: string) =>
+  lat != null && lng != null
+    ? `https://www.google.com/maps/@${lat},${lng},17z/data=!3m1!1e3`
+    : address
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+      : undefined;
 interface REData {
   headquarters: string;
   ownershipSummary: string;
@@ -46,7 +56,10 @@ const TOOL = {
         items: {
           type: "object",
           properties: {
-            location: { type: "string" },
+            location: { type: "string", description: "The location as described in the 10-K (city/region)." },
+            address: { type: "string", description: "Best-known real street address for this facility if you are confident (e.g. HQ, well-known plants). Omit rather than invent a precise address; a city-level address is fine." },
+            lat: { type: "number", description: "Approximate WGS84 latitude, if known." },
+            lng: { type: "number", description: "Approximate WGS84 longitude, if known." },
             purpose: { type: "string", description: "e.g. manufacturing, R&D, data center, retail, HQ, warehouse" },
             tenure: { type: "string", enum: ["owned", "leased", "mixed", "unknown"] },
             size: { type: "string", description: "square footage / acreage if stated" },
@@ -104,7 +117,7 @@ export const realEstateConnector: Connector = {
     if (!entity.cik) return result(meta, { status: "not-applicable", note: "No SEC CIK — not an SEC registrant." });
     if (!process.env.ANTHROPIC_API_KEY) return result(meta, { status: "no-data", note: "Property summary requires ANTHROPIC_API_KEY.", tookMs: Date.now() - start });
     try {
-      let data = getCached<REData>("realestate", entity.ticker, 1000 * 60 * 60 * 24 * 90);
+      let data = getCached<REData>("realestate2", entity.ticker, 1000 * 60 * 60 * 24 * 90);
       if (!data) {
         const filing = await latest10K(entity.cik, ctx.signal);
         if (!filing) return result(meta, { status: "no-data", note: "No 10-K on file (may be a foreign filer with 20-F).", tookMs: Date.now() - start });
@@ -134,7 +147,7 @@ export const realEstateConnector: Connector = {
           filingUrl: filing.url,
           filingDate: filing.date,
         };
-        if (data.facilities.length || data.summary) setCached("realestate", entity.ticker, data);
+        if (data.facilities.length || data.summary) setCached("realestate2", entity.ticker, data);
       }
 
       const owned = data.facilities.filter((f) => f.tenure === "owned").length;
@@ -151,9 +164,14 @@ export const realEstateConnector: Connector = {
       if (data.facilities.length)
         detail.push({
           kind: "table",
-          title: "Facilities (from 10-K)",
-          columns: [{ label: "Location" }, { label: "Purpose" }, { label: "Tenure" }, { label: "Size" }],
-          rows: data.facilities.map((f) => ({ cells: [f.location, f.purpose, f.tenure, f.size ?? "—"] })),
+          title: "Facilities (from 10-K, addresses best-effort)",
+          columns: [{ label: "Location" }, { label: "Address" }, { label: "Purpose" }, { label: "Tenure" }, { label: "Size" }],
+          rows: data.facilities.map((f) => ({
+            cells: [f.location, f.address ?? "—", f.purpose, f.tenure, f.size ?? "—"],
+            href: mapsLink(f.lat, f.lng, f.address),
+            hrefLabel: "🛰 View",
+          })),
+          note: "10-Ks describe locations broadly; addresses/coordinates are best-known enrichments (reliable for HQs & major plants). Parcel-level ownership needs ATTOM/Regrid/Reonomy.",
         });
       if (data.expansionSignals.length)
         detail.push({ kind: "keyvals", title: "Expansion / new-facility signals", items: data.expansionSignals.map((s, i) => ({ label: `#${i + 1}`, value: s })) });
