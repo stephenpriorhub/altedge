@@ -1,59 +1,8 @@
 /**
- * Premium + roadmap connectors. These are REAL registry entries with enabled:false
- * so the UI renders them as locked "coming soon" cards and the architecture is
- * proven to accept them — wiring one up later is: flip enabled, implement fetch(),
- * add the API key. No other part of the app changes.
- *
- * v1 decision (2026-07-09): free sources only; satellite + mobile-location are
- * roadmap, not built.
+ * Coming-soon / locked connectors were removed at the publisher's request (2026-07-09).
+ * To bring back a "coming soon" card, add a Connector here with `enabled: false` — the
+ * registry and UI already render disabled connectors as locked cards.
  */
-import { result, type Connector, type ConnectorTier, type SignalCategory } from "./types";
+import type { Connector } from "./types";
 
-function lockedConnector(cfg: {
-  id: string;
-  label: string;
-  category: SignalCategory;
-  tier: ConnectorTier;
-  description: string;
-}): Connector {
-  const meta = { id: cfg.id, label: cfg.label, category: cfg.category, tier: cfg.tier } as const;
-  return {
-    ...meta,
-    enabled: false,
-    description: cfg.description,
-    requiredIdentifiers: [],
-    async fetch() {
-      return result(meta, {
-        status: "not-applicable",
-        note: "Connector not enabled in this build.",
-      });
-    },
-  };
-}
-
-export const stubConnectors: Connector[] = [
-  // ── Premium: paid API, drop-in when budget approved ──
-  lockedConnector({
-    id: "sensortower",
-    label: "App Downloads (Sensor Tower)",
-    category: "apps",
-    tier: "premium",
-    description: "True install & DAU estimates across iOS + Android. Requires a Sensor Tower plan.",
-  }),
-  lockedConnector({
-    id: "revelio",
-    label: "Attrition & Flows",
-    category: "hiring",
-    tier: "premium",
-    description: "Employee inflows/outflows and attrition by role & geo (beyond headcount level). Requires Revelio Labs.",
-  }),
-
-  // ── Roadmap: expensive + hard to make defensible; deprioritized in v1 ──
-  lockedConnector({
-    id: "mobile-location",
-    label: "Foot Traffic (Mobile Location)",
-    category: "geo",
-    tier: "roadmap",
-    description: "Store-visit trends from mobile-location panels. Costly and privacy-sensitive.",
-  }),
-];
+export const stubConnectors: Connector[] = [];
