@@ -34,25 +34,11 @@ function lockedConnector(cfg: {
 export const stubConnectors: Connector[] = [
   // ── Premium: paid API, drop-in when budget approved ──
   lockedConnector({
-    id: "similarweb",
-    label: "Web Traffic (SimilarWeb)",
-    category: "web",
-    tier: "premium",
-    description: "Precise site visits, engagement and channel mix. Requires a SimilarWeb API plan.",
-  }),
-  lockedConnector({
     id: "sensortower",
     label: "App Downloads (Sensor Tower)",
     category: "apps",
     tier: "premium",
     description: "True install & DAU estimates across iOS + Android. Requires a Sensor Tower plan.",
-  }),
-  lockedConnector({
-    id: "playstore",
-    label: "Google Play Signal",
-    category: "apps",
-    tier: "premium",
-    description: "Android install & rating momentum. No free official API — needs a third-party provider.",
   }),
   lockedConnector({
     id: "revelio",
