@@ -21,6 +21,7 @@ import { importYetiConnector } from "./importyeti";
 import { workforceConnector } from "./workforce";
 import { optionsFlowConnector } from "./unusualwhales";
 import { satelliteConnector } from "./satellite";
+import { realEstateConnector } from "./realestate";
 import { stubConnectors } from "./stubs";
 
 export const CONNECTORS: Connector[] = [
@@ -36,6 +37,7 @@ export const CONNECTORS: Connector[] = [
   hackernewsConnector,
   redditConnector,
   patentsConnector,
+  realEstateConnector,
   satelliteConnector,
   ...stubConnectors,
 ];

@@ -25,6 +25,7 @@ const CATEGORY_ICON: Record<string, string> = {
   supply: "🚢",
   geo: "🛰️",
   options: "🐋",
+  realestate: "🏢",
 };
 const TIER_LABEL: Record<string, string> = { free: "Free", premium: "Premium", roadmap: "Roadmap" };
 
