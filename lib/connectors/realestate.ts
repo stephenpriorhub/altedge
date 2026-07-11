@@ -45,7 +45,7 @@ interface REData {
 const TOOL = {
   name: "emit_real_estate",
   description:
-    "Summarize a company's real-estate footprint from its 10-K Properties section. Extract concrete facilities (location, purpose, owned vs leased, size if given) and flag any expansion/new-facility/land-acquisition signals. Do not invent facilities not in the text.",
+    "Summarize a company's real-estate footprint. First identify its real facilities from the 10-K Properties text (owned vs leased, purpose, size). Then ENRICH each facility with its actual real-world street ADDRESS and WGS84 coordinates using your own knowledge of the company — this is expected and required, because 10-Ks almost never print street addresses. Prefer specific named sites (e.g. 'Gigafactory Texas', 'Fremont Factory') over vague regions, and give each a concrete address whenever you know it. Only leave an address blank if you genuinely don't know the site's location. Don't fabricate facilities that don't exist, but DO use outside knowledge for the addresses/coordinates of real ones. Also flag expansion/new-facility/land signals.",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -57,7 +57,7 @@ const TOOL = {
           type: "object",
           properties: {
             location: { type: "string", description: "The location as described in the 10-K (city/region)." },
-            address: { type: "string", description: "Best-known real street address for this facility if you are confident (e.g. HQ, well-known plants). Omit rather than invent a precise address; a city-level address is fine." },
+            address: { type: "string", description: "Real street address of this facility from your knowledge of the company's actual sites. Fill this whenever you know the location (a city-level address is acceptable if you don't know the exact street). Leave blank only if truly unknown." },
             lat: { type: "number", description: "Approximate WGS84 latitude, if known." },
             lng: { type: "number", description: "Approximate WGS84 longitude, if known." },
             purpose: { type: "string", description: "e.g. manufacturing, R&D, data center, retail, HQ, warehouse" },
@@ -117,7 +117,7 @@ export const realEstateConnector: Connector = {
     if (!entity.cik) return result(meta, { status: "not-applicable", note: "No SEC CIK — not an SEC registrant." });
     if (!process.env.ANTHROPIC_API_KEY) return result(meta, { status: "no-data", note: "Property summary requires ANTHROPIC_API_KEY.", tookMs: Date.now() - start });
     try {
-      let data = getCached<REData>("realestate2", entity.ticker, 1000 * 60 * 60 * 24 * 90);
+      let data = getCached<REData>("realestate3", entity.ticker, 1000 * 60 * 60 * 24 * 90);
       if (!data) {
         const filing = await latest10K(entity.cik, ctx.signal);
         if (!filing) return result(meta, { status: "no-data", note: "No 10-K on file (may be a foreign filer with 20-F).", tookMs: Date.now() - start });
@@ -129,10 +129,15 @@ export const realEstateConnector: Connector = {
         const msg = await client.messages.create(
           {
             model: SYNTH_MODEL,
-            max_tokens: 1500,
+            max_tokens: 2500,
             tool_choice: { type: "tool", name: TOOL.name },
             tools: [TOOL],
-            messages: [{ role: "user", content: `${entity.companyName} (${entity.ticker}) — 10-K Item 2 Properties:\n\n${section}` }],
+            messages: [
+              {
+                role: "user",
+                content: `Company: ${entity.companyName} (${entity.ticker}).\n\n10-K Item 2 Properties (source of which facilities exist):\n${section}\n\nList the company's real facilities from this text, then enrich EACH with its real street address and WGS84 lat/lng from your knowledge of ${entity.companyName}'s actual sites (HQ, plants, gigafactories, major offices, DCs). Fill the address field wherever you know the location.`,
+              },
+            ],
           },
           { signal: ctx.signal }
         );
@@ -147,7 +152,7 @@ export const realEstateConnector: Connector = {
           filingUrl: filing.url,
           filingDate: filing.date,
         };
-        if (data.facilities.length || data.summary) setCached("realestate2", entity.ticker, data);
+        if (data.facilities.length || data.summary) setCached("realestate3", entity.ticker, data);
       }
 
       const owned = data.facilities.filter((f) => f.tenure === "owned").length;
