@@ -14,7 +14,8 @@ export type SignalCategory =
   | "web"
   | "apps"
   | "supply"
-  | "geo";
+  | "geo"
+  | "options";
 
 export type SignalStatus = "ok" | "no-data" | "not-applicable" | "error";
 

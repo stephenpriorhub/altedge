@@ -10,6 +10,8 @@ import type {
   LockedInfo,
   DetailSection,
 } from "@/lib/ui-types";
+import type { Fundamentals } from "@/lib/fundamentals";
+import type { Watchlist } from "@/lib/watchlist";
 
 const CATEGORY_ICON: Record<string, string> = {
   identity: "🏷️",
@@ -22,6 +24,7 @@ const CATEGORY_ICON: Record<string, string> = {
   apps: "📱",
   supply: "🚢",
   geo: "🛰️",
+  options: "🐋",
 };
 const TIER_LABEL: Record<string, string> = { free: "Free", premium: "Premium", roadmap: "Roadmap" };
 
@@ -400,6 +403,114 @@ function CompanyHeader({ entity }: { entity: ResolvedEntity }) {
   );
 }
 
+function FundamentalsCard({ f }: { f: Fundamentals | null }) {
+  if (!f) return null;
+  const fmtCap = (n?: number) => (n ? (n >= 1e12 ? `$${(n / 1e12).toFixed(2)}T` : `$${(n / 1e9).toFixed(1)}B`) : "—");
+  return (
+    <section className="rounded-xl border border-border bg-surface p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-lg font-semibold">Fundamentals & Earnings</h2>
+        {f.nextEarningsDate && (
+          <span className="rounded-lg bg-accent/15 px-3 py-1 text-xs font-medium text-accent">
+            📅 Next earnings: {f.nextEarningsDate}{f.announceTime ? ` (${f.announceTime})` : ""}
+          </span>
+        )}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {[
+          ["Market cap", fmtCap(f.marketCap)],
+          ["Beta", f.beta?.toFixed(2) ?? "—"],
+          ["Sector", f.sector ?? "—"],
+          ["Avg 30d vol", f.avg30Volume ? f.avg30Volume.toLocaleString() : "—"],
+        ].map(([k, v]) => (
+          <div key={k} className="rounded-lg bg-surface-2 px-3 py-2">
+            <div className="text-[10px] uppercase tracking-wide text-muted">{k}</div>
+            <div className="truncate text-sm font-semibold">{v}</div>
+          </div>
+        ))}
+      </div>
+      {f.history.length > 0 && (
+        <div className="mt-4 overflow-x-auto">
+          <div className="mb-1 text-xs font-medium text-muted">Historical earnings (EPS)</div>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border text-muted">
+                <th className="px-2 py-1.5 text-left font-medium">Report date</th>
+                <th className="px-2 py-1.5 text-right font-medium">Est. EPS</th>
+                <th className="px-2 py-1.5 text-right font-medium">Actual EPS</th>
+                <th className="px-2 py-1.5 text-right font-medium">Surprise</th>
+              </tr>
+            </thead>
+            <tbody>
+              {f.history.map((r, i) => (
+                <tr key={i} className="border-b border-border/50">
+                  <td className="px-2 py-1.5">{r.reportDate}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{r.estimatedEps ?? "—"}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{r.reportedEps ?? "—"}</td>
+                  <td className={`px-2 py-1.5 text-right tabular-nums ${r.surprisePct == null ? "text-muted" : r.surprisePct >= 0 ? "text-bull" : "text-bear"}`}>
+                    {r.surprisePct == null ? "—" : `${r.surprisePct >= 0 ? "+" : ""}${r.surprisePct.toFixed(1)}%`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function WatchlistPanel({
+  tickers,
+  all,
+  isSuperAdmin,
+  onPick,
+  onRemove,
+}: {
+  tickers: string[];
+  all: Watchlist[] | null;
+  isSuperAdmin: boolean;
+  onPick: (t: string) => void;
+  onRemove: (t: string) => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  return (
+    <section className="rounded-xl border border-border bg-surface p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">★ Your watchlist</h2>
+        {isSuperAdmin && <button onClick={() => setShowAll((v) => !v)} className="text-xs text-accent hover:underline">{showAll ? "Hide" : "View"} all users</button>}
+      </div>
+      {tickers.length === 0 ? (
+        <p className="mt-2 text-xs text-muted">No tickers yet. Search one and tap ★ to follow it — followed tickers are scanned daily so trends build automatically.</p>
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {tickers.map((t) => (
+            <span key={t} className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface-2 px-2 py-1 text-sm">
+              <button onClick={() => onPick(t)} className="font-medium text-accent hover:underline">{t}</button>
+              <button onClick={() => onRemove(t)} className="text-muted hover:text-bear" aria-label={`remove ${t}`}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+      {isSuperAdmin && showAll && all && (
+        <div className="mt-4 border-t border-border pt-3">
+          <div className="mb-2 text-xs font-medium text-muted">All users</div>
+          <div className="space-y-2">
+            {all.map((wl) => (
+              <div key={wl.userId} className="text-xs">
+                <span className="text-foreground/80">{wl.email || wl.userId}</span>
+                <span className="ml-2 text-muted">{wl.tickers.length ? wl.tickers.map((t) => (
+                  <button key={t} onClick={() => onPick(t)} className="mr-1 text-accent hover:underline">{t}</button>
+                )) : "—"}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function Home() {
   const [ticker, setTicker] = useState("");
   const [entity, setEntity] = useState<ResolvedEntity | null>(null);
@@ -411,7 +522,31 @@ export default function Home() {
   const [synthesis, setSynthesis] = useState<Synthesis | null>(null);
   const [synthLoading, setSynthLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [fundamentals, setFundamentals] = useState<Fundamentals | null>(null);
+  const [watchTickers, setWatchTickers] = useState<string[]>([]);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [allWatchlists, setAllWatchlists] = useState<Watchlist[] | null>(null);
   const runId = useRef(0);
+
+  // Load the user's watchlist (+ all users if super-admin) once.
+  useEffect(() => {
+    fetch("/api/watchlist")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.watchlist) setWatchTickers(d.watchlist.tickers ?? []);
+        setIsSuperAdmin(!!d.isSuperAdmin);
+        if (d.isSuperAdmin) fetch("/api/watchlist?scope=all").then((r) => r.json()).then((a) => setAllWatchlists(a.all ?? null)).catch(() => {});
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggleWatch = useCallback((t: string, add: boolean) => {
+    setWatchTickers((prev) => (add ? [...new Set([...prev, t])].sort() : prev.filter((x) => x !== t)));
+    fetch("/api/watchlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticker: t, action: add ? "add" : "remove" }) })
+      .then((r) => r.json())
+      .then((d) => d.watchlist && setWatchTickers(d.watchlist.tickers ?? []))
+      .catch(() => {});
+  }, []);
 
   const runSynthesis = useCallback(async (tk: string, sigs: SignalResult[]) => {
     setSynthLoading(true);
@@ -426,9 +561,10 @@ export default function Home() {
     }
   }, []);
 
-  const search = useCallback(async () => {
-    const tk = ticker.trim().toUpperCase();
+  const search = useCallback(async (override?: string) => {
+    const tk = (override ?? ticker).trim().toUpperCase();
     if (!tk) return;
+    if (override) setTicker(tk);
     const id = ++runId.current;
     setLoading(true);
     setError(null);
@@ -517,6 +653,22 @@ export default function Home() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  // Fetch key fundamentals + earnings whenever the resolved company changes.
+  useEffect(() => {
+    if (!entity) {
+      setFundamentals(null);
+      return;
+    }
+    let alive = true;
+    fetch(`/api/fundamentals?ticker=${encodeURIComponent(entity.ticker)}`)
+      .then((r) => r.json())
+      .then((d) => alive && setFundamentals(d.fundamentals ?? null))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [entity]);
+
   const navSource = useCallback(
     (dir: -1 | 1) => {
       if (selectedIdx < 0) return;
@@ -543,19 +695,28 @@ export default function Home() {
           className="flex-1 rounded-lg border border-border bg-surface px-4 py-2.5 text-sm outline-none focus:border-accent"
           maxLength={10}
         />
-        <button onClick={search} disabled={loading} className="rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50">{loading ? "Scanning…" : "Analyze"}</button>
+        <button onClick={() => search()} disabled={loading} className="rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50">{loading ? "Scanning…" : "Analyze"}</button>
       </div>
 
       {error && <div className="mt-4 rounded-lg border border-bear/40 bg-bear/10 px-4 py-3 text-sm text-bear">{error}</div>}
 
       {entity && (
         <div className="mt-6 space-y-6">
+          <div className="flex justify-end">
+            <button
+              onClick={() => toggleWatch(entity.ticker, !watchTickers.includes(entity.ticker))}
+              className={`rounded-lg border px-3 py-1.5 text-sm ${watchTickers.includes(entity.ticker) ? "border-accent bg-accent/15 text-accent" : "border-border text-muted hover:text-foreground"}`}
+            >
+              {watchTickers.includes(entity.ticker) ? "★ Following" : "☆ Follow"}
+            </button>
+          </div>
           <CompanyHeader entity={entity} />
 
           {selected ? (
             <SourceDetailPage signal={selected} onBack={backToResults} onNav={navSource} navInfo={{ index: selectedIdx, total: orderedSignals.length }} />
           ) : (
             <>
+              <FundamentalsCard f={fundamentals} />
               {(synthLoading || synthesis) && <ThesisPanel synthesis={synthesis} loading={synthLoading} />}
 
               {(orderedSignals.length > 0 || pendingWaiting.length > 0) && (
@@ -585,11 +746,22 @@ export default function Home() {
         </div>
       )}
 
-      {!entity && !loading && !error && (
-        <div className="mt-16 text-center text-sm text-muted">
-          Try <button className="text-accent" onClick={() => setTicker("NVDA")}>NVDA</button>,{" "}
-          <button className="text-accent" onClick={() => setTicker("SHOP")}>SHOP</button>, or{" "}
-          <button className="text-accent" onClick={() => setTicker("KO")}>KO</button>.
+      {!entity && !loading && (
+        <div className="mt-6 space-y-6">
+          <WatchlistPanel
+            tickers={watchTickers}
+            all={allWatchlists}
+            isSuperAdmin={isSuperAdmin}
+            onPick={(t) => search(t)}
+            onRemove={(t) => toggleWatch(t, false)}
+          />
+          {!error && (
+            <div className="text-center text-sm text-muted">
+              Try <button className="text-accent" onClick={() => search("NVDA")}>NVDA</button>,{" "}
+              <button className="text-accent" onClick={() => search("SHOP")}>SHOP</button>, or{" "}
+              <button className="text-accent" onClick={() => search("KO")}>KO</button>.
+            </div>
+          )}
         </div>
       )}
     </main>

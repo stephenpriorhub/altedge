@@ -64,13 +64,6 @@ export const stubConnectors: Connector[] = [
 
   // ── Roadmap: expensive + hard to make defensible; deprioritized in v1 ──
   lockedConnector({
-    id: "satellite",
-    label: "Satellite Imagery",
-    category: "geo",
-    tier: "roadmap",
-    description: "Parking-lot / construction / storage-tank change detection. Heavy ML + costly imagery.",
-  }),
-  lockedConnector({
     id: "mobile-location",
     label: "Foot Traffic (Mobile Location)",
     category: "geo",
