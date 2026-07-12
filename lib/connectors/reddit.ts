@@ -45,7 +45,7 @@ export const redditConnector: Connector = {
         `&sort=new&limit=100&t=month`;
       const data = await getJson<{ data: { children: RedditChild[] } }>(url, {
         signal: ctx.signal,
-        headers: { "User-Agent": "oxfordhub-altedge/1.0 (research tool)" },
+        headers: { "User-Agent": "oxfordhub-shadowdata/1.0 (research tool)" },
       });
       const posts = (data.data?.children ?? []).map((c) => c.data);
       if (posts.length === 0) {

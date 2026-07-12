@@ -8,7 +8,7 @@
  *  2. Fallback: Google Jobs via SearchApi → universal coverage (Tesla, Apple, etc. that run
  *     their own ATS). Returns a SAMPLE of active roles (not a precise total).
  *
- * Hiring TREND: AltEdge snapshots every scan, so we plot the recorded role count across past
+ * Hiring TREND: ShadowData snapshots every scan, so we plot the recorded role count across past
  * scans — it becomes a real time series as scans accrue. (Precise hiring-volume history for
  * own-ATS companies, and true headcount/attrition, need a paid workforce API — Coresignal/PDL/Revelio.)
  */

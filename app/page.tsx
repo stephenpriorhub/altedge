@@ -644,7 +644,7 @@ export default function Home() {
   // Open a detail page and push a history entry so the browser Back button returns to results.
   const openDetail = useCallback((id: string) => {
     try {
-      window.history.pushState({ altedgeDetail: id }, "");
+      window.history.pushState({ shadowdataDetail: id }, "");
     } catch {
       /* history unavailable */
     }
@@ -653,7 +653,7 @@ export default function Home() {
   }, []);
 
   const backToResults = useCallback(() => {
-    if (typeof window !== "undefined" && window.history.state?.altedgeDetail) window.history.back();
+    if (typeof window !== "undefined" && window.history.state?.shadowdataDetail) window.history.back();
     else setSelectedId(null);
   }, []);
 
@@ -693,7 +693,7 @@ export default function Home() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
       <header className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">AltEdge <span className="text-accent">·</span> <span className="text-base font-normal text-muted">Alternative Data Terminal</span></h1>
+        <h1 className="text-2xl font-bold tracking-tight">ShadowData <span className="text-accent">·</span> <span className="text-base font-normal text-muted">Alternative Data Terminal</span></h1>
         <p className="mt-1 text-sm text-muted">Search a ticker for live alternative-data signals and an evidence-backed investment thesis.</p>
       </header>
 

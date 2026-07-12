@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   return NextResponse.json({
     ok: true,
-    service: "altedge",
+    service: "shadowdata",
     env: {
       anthropic: !!process.env.ANTHROPIC_API_KEY,
       polygon: !!process.env.POLYGON_API_KEY,

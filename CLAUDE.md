@@ -1,8 +1,8 @@
-# AltEdge — Alternative Data Terminal (OxfordHub app)
+# ShadowData — Alternative Data Terminal (OxfordHub app)
 
 Search a stock ticker → pull live **alternative data** (non-financial-statement
 signals) and an evidence-backed, defensible investment thesis (short-term vs
-long-term, bull/bear, cited). Lives at `altedge.oxfordhub.app`.
+long-term, bull/bear, cited). Lives at `shadowdata.oxfordhub.app`.
 
 ## Stack
 Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind v4 ·
@@ -56,11 +56,11 @@ land) · `POST /api/synthesize` · `GET /api/health`. All gated by `requireHubUs
 **v1 writes NOTHING to the brain** (decision 2026-07-09; trading/market apps need
 publisher sign-off per the 2026-07-01 rule). App-side snapshots accrue in
 `DATA_DIR/snapshots/<TICKER>.json` and are shaped to be brain-ready for a future
-phase (a `kind:"altedge-snapshot"` in brain-map's `/api/intelligence`).
+phase (a `kind:"shadowdata-snapshot"` in brain-map's `/api/intelligence`).
 
 ## Env
 Reused (Railway project level): `ANTHROPIC_API_KEY`, `POLYGON_API_KEY`,
-`GITHUB_TOKEN`, `HUB_API_TOKEN`. App: `NEXT_PUBLIC_HUB_PROJECT_ID=altedge`,
+`GITHUB_TOKEN`, `HUB_API_TOKEN`. App: `NEXT_PUBLIC_HUB_PROJECT_ID=shadowdata`,
 `HUB_URL`, `DATA_DIR`, `SEC_USER_AGENT`. Optional free: `PATENTSVIEW_API_KEY`,
 `REDDIT_CLIENT_ID/SECRET`. See `.env.example`.
 

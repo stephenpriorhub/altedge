@@ -1,4 +1,4 @@
-# Agent notes for AltEdge
+# Agent notes for ShadowData
 
 > ⚠️ **This app runs Next.js 16 + React 19 + Tailwind v4**, which are newer than
 > most training data. App Router route handlers, `text/event-stream` streaming

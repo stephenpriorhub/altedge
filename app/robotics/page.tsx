@@ -19,7 +19,7 @@ function fmtVal(m: number | null): string {
 }
 
 function Row({ item }: { item: RoboticsWatchItem }) {
-  const linkable = !!item.altedgeTicker;
+  const linkable = !!item.shadowdataTicker;
   const inner = (
     <div className="flex items-start gap-3 rounded-xl border border-border bg-surface p-4 transition group-hover:border-accent/60">
       <span className="mt-0.5 text-xl">{ROLE_ICON[item.type] ?? "•"}</span>
@@ -37,7 +37,7 @@ function Row({ item }: { item: RoboticsWatchItem }) {
           </span>
           <span className="text-muted">{item.country}</span>
           {linkable ? (
-            <span className="ml-auto font-medium text-accent">Open AltEdge profile →</span>
+            <span className="ml-auto font-medium text-accent">Open ShadowData profile →</span>
           ) : (
             <a
               href="https://humanoids.fyi"
@@ -54,7 +54,7 @@ function Row({ item }: { item: RoboticsWatchItem }) {
     </div>
   );
   return linkable ? (
-    <Link href={`/?ticker=${item.altedgeTicker}`} className="group block">
+    <Link href={`/?ticker=${item.shadowdataTicker}`} className="group block">
       {inner}
     </Link>
   ) : (
@@ -77,8 +77,8 @@ export default function RoboticsWatchlist() {
   }, []);
 
   const { tradeable, global } = useMemo(() => {
-    const t = (items ?? []).filter((i) => i.altedgeTicker);
-    const g = (items ?? []).filter((i) => !i.altedgeTicker);
+    const t = (items ?? []).filter((i) => i.shadowdataTicker);
+    const g = (items ?? []).filter((i) => !i.shadowdataTicker);
     return { tradeable: t, global: g };
   }, [items]);
 
@@ -87,7 +87,7 @@ export default function RoboticsWatchlist() {
       <header className="mb-6">
         <div className="flex items-center gap-2">
           <Link href="/" className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground">
-            ← AltEdge
+            ← ShadowData
           </Link>
         </div>
         <h1 className="mt-4 text-2xl font-bold tracking-tight">
@@ -115,7 +115,7 @@ export default function RoboticsWatchlist() {
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
               US-tradeable{" "}
               <span className="font-normal normal-case">
-                — {tradeable.length} names, click any for its full AltEdge profile
+                — {tradeable.length} names, click any for its full ShadowData profile
               </span>
             </h2>
             <div className="grid gap-3">
@@ -130,7 +130,7 @@ export default function RoboticsWatchlist() {
               <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
                 Global-listed{" "}
                 <span className="font-normal normal-case">
-                  — {global.length} names on foreign exchanges (not resolvable in AltEdge)
+                  — {global.length} names on foreign exchanges (not resolvable in ShadowData)
                 </span>
               </h2>
               <div className="grid gap-3">

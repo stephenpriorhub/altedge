@@ -41,7 +41,7 @@ export async function register() {
 
   async function runScan() {
     if (!CRON_TOKEN) {
-      console.error("[AltEdge] Daily scan skipped — no HUB_API_TOKEN/CRON_SECRET in env");
+      console.error("[ShadowData] Daily scan skipped — no HUB_API_TOKEN/CRON_SECRET in env");
       return;
     }
     try {
@@ -51,17 +51,17 @@ export async function register() {
       });
       const data = (await res.json()) as { scanned?: number };
       console.log(
-        `[AltEdge] Daily scan complete — status ${res.status}, scanned ${data.scanned ?? "?"} ticker(s)`,
+        `[ShadowData] Daily scan complete — status ${res.status}, scanned ${data.scanned ?? "?"} ticker(s)`,
       );
     } catch (err) {
-      console.error("[AltEdge] Daily scan failed:", err);
+      console.error("[ShadowData] Daily scan failed:", err);
     }
   }
 
   function scheduleNext() {
     const delay = msUntilNextRun();
     console.log(
-      `[AltEdge] Daily watchlist scan scheduled — next run in ~${Math.round(delay / 60000)} min (06:00 ET)`,
+      `[ShadowData] Daily watchlist scan scheduled — next run in ~${Math.round(delay / 60000)} min (06:00 ET)`,
     );
     setTimeout(async () => {
       await runScan();

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { requireHubUser } from "@/lib/hub-auth";
 import {
   ROLE_LABEL,
-  altedgeTickerFor,
+  shadowdataTickerFor,
   cleanCompanyName,
   exchangeLabel,
   getAtlasCompanies,
@@ -22,7 +22,7 @@ export interface RoboticsWatchItem {
   name: string; // clean company name
   ticker: string; // as listed (may carry exchange suffix)
   exchange: string | null; // human label for foreign listings
-  altedgeTicker: string | null; // deep-linkable AltEdge symbol, or null
+  shadowdataTicker: string | null; // deep-linkable ShadowData symbol, or null
   type: AtlasEntityType;
   role: string;
   country: string;
@@ -40,7 +40,7 @@ const TYPE_ORDER: Record<AtlasEntityType, number> = {
 /**
  * GET /api/robotics → every publicly-traded company in the Humanoid Atlas, with a one-line
  * tie to robotics, valuation, and (when tradeable in the US) a deep-link symbol into its
- * AltEdge profile. Split client-side into US-tradeable vs global-listed.
+ * ShadowData profile. Split client-side into US-tradeable vs global-listed.
  */
 export async function GET(req: NextRequest) {
   const gate = await requireHubUser(req);
@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
         name: cleanCompanyName(c.name),
         ticker: c.ticker!.toUpperCase(),
         exchange: exchangeLabel(c.ticker!),
-        altedgeTicker: altedgeTickerFor(c),
+        shadowdataTicker: shadowdataTickerFor(c),
         type: c.type,
         role: ROLE_LABEL[c.type] ?? "Robotics company",
         country: c.country,
@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
       }))
       .sort((a, b) => {
         // Tradeable-here first, then OEM→supplier, then by valuation desc, then name.
-        const link = Number(!!b.altedgeTicker) - Number(!!a.altedgeTicker);
+        const link = Number(!!b.shadowdataTicker) - Number(!!a.shadowdataTicker);
         if (link) return link;
         const t = TYPE_ORDER[a.type] - TYPE_ORDER[b.type];
         if (t) return t;
@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
       items,
       counts: {
         total: items.length,
-        tradeable: items.filter((i) => i.altedgeTicker).length,
+        tradeable: items.filter((i) => i.shadowdataTicker).length,
       },
       source: "Humanoid Atlas · Humanoids.FYI",
       generatedAt: new Date().toISOString(),

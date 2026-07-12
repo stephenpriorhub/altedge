@@ -2,10 +2,10 @@
  * OxfordHub user identification (mirrors promo-analyzer/lib/hub-auth.ts).
  *
  * Mechanism: the hub session cookie is domain-scoped to .oxfordhub.app, so the
- * browser sends it with every request to altedge.oxfordhub.app. We forward it
+ * browser sends it with every request to shadowdata.oxfordhub.app. We forward it
  * server-side to the hub's /api/me to resolve {id, email, name, role}.
  *
- * AltEdge is read-only decision-support with no mutations, so routes only need
+ * ShadowData is read-only decision-support with no mutations, so routes only need
  * "is this a signed-in, authorized hub user?" — enforced by requireHubUser().
  * Fail-closed: if the hub is unreachable or the cookie is invalid, access is
  * denied (reads here still cost external API calls, so we gate them).
@@ -14,7 +14,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-const HUB_PROJECT_ID = process.env.NEXT_PUBLIC_HUB_PROJECT_ID || "altedge";
+const HUB_PROJECT_ID = process.env.NEXT_PUBLIC_HUB_PROJECT_ID || "shadowdata";
 const HUB_ME_URL =
   (process.env.HUB_URL ?? "https://oxfordhub.app") + `/api/me?projectId=${HUB_PROJECT_ID}`;
 
@@ -79,7 +79,7 @@ export async function requireHubUser(
   }
   return {
     response: NextResponse.json(
-      { error: "Sign in to OxfordHub to use AltEdge." },
+      { error: "Sign in to OxfordHub to use ShadowData." },
       { status: 401 }
     ),
   };

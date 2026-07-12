@@ -8,7 +8,7 @@
  *
  * All list calls are cached on the DATA_DIR volume (24h) so a scan never hammers the API.
  * Matching is deliberately conservative — a wrong match would attach robotics data to the
- * wrong company, which violates AltEdge's defensibility rule — so we verify every
+ * wrong company, which violates ShadowData's defensibility rule — so we verify every
  * ticker hit with a name-overlap check before trusting it.
  */
 import { getJson } from "./connectors/http";
@@ -208,7 +208,7 @@ function buildTickerIndex(companies: AtlasCompanyLite[]): Map<string, AtlasCompa
 }
 
 /**
- * Resolve an AltEdge-resolved company (ticker + name) to an Atlas company, or null.
+ * Resolve an ShadowData-resolved company (ticker + name) to an Atlas company, or null.
  * A ticker hit is only trusted if the two company names share a distinctive word, or the
  * pair is in the curated alias bridge — this rejects symbol collisions like MBLY.
  */
@@ -232,11 +232,11 @@ export function matchAtlasCompany(
 }
 
 /**
- * The AltEdge-searchable symbol for an Atlas company, or null if it can't be looked up here.
- * AltEdge resolves via SEC/Polygon (US registrants + ADRs), so foreign exchange listings
+ * The ShadowData-searchable symbol for an Atlas company, or null if it can't be looked up here.
+ * ShadowData resolves via SEC/Polygon (US registrants + ADRs), so foreign exchange listings
  * (dotted tickers like 6324.T) and unverified symbols aren't deep-linkable to a profile.
  */
-export function altedgeTickerFor(c: AtlasCompanyLite): string | null {
+export function shadowdataTickerFor(c: AtlasCompanyLite): string | null {
   if (!c.ticker) return null;
   const t = c.ticker.toUpperCase().trim();
   if (t.includes(".")) return null; // foreign exchange listing

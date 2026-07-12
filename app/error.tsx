@@ -10,7 +10,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
     <main className="mx-auto max-w-2xl px-4 py-16 text-center">
       <h1 className="text-xl font-semibold">Something went wrong</h1>
       <p className="mt-2 text-sm text-muted">
-        AltEdge hit an unexpected error rendering this view. Your data isn&apos;t lost — try again.
+        ShadowData hit an unexpected error rendering this view. Your data isn&apos;t lost — try again.
       </p>
       {error?.message && (
         <pre className="mt-4 overflow-x-auto rounded-lg border border-border bg-surface p-3 text-left text-xs text-bear">

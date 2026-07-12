@@ -1,5 +1,5 @@
 /**
- * Claude models used by AltEdge. Budget-conscious split: a cheap model resolves
+ * Claude models used by ShadowData. Budget-conscious split: a cheap model resolves
  * entity identifiers (mechanical extraction), a stronger model does thesis
  * synthesis (reasoning that must be defensible).
  */

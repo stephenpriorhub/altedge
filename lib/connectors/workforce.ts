@@ -5,7 +5,7 @@
  * is actually scaling.
  *
  * PDL returns the CURRENT employee_count + employee_count_by_country (this plan has no
- * built-in history), so the headcount TREND is accrued from AltEdge's per-scan snapshots
+ * built-in history), so the headcount TREND is accrued from ShadowData's per-scan snapshots
  * — it fills in as the ticker is re-scanned over time. Credit-metered → cached 7 days.
  */
 import { getJson, classifyFailure } from "./http";
@@ -94,7 +94,7 @@ export const workforceConnector: Connector = {
       if (countries.length) metrics.push({ name: "Countries", value: countries.length });
 
       const detail: DetailSection[] = [];
-      if (ts) detail.push({ kind: "timeseries", title: "Headcount trend", series: ts, note: "Builds as you re-scan this ticker (PDL gives current headcount; AltEdge accrues the history)." });
+      if (ts) detail.push({ kind: "timeseries", title: "Headcount trend", series: ts, note: "Builds as you re-scan this ticker (PDL gives current headcount; ShadowData accrues the history)." });
       if (countries.length)
         detail.push({
           kind: "bars",

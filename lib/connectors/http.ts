@@ -7,7 +7,7 @@
 
 const DEFAULT_UA =
   process.env.SEC_USER_AGENT ||
-  "OxfordHub AltEdge (sprior@monumenttradersalliance.com)";
+  "OxfordHub ShadowData (sprior@monumenttradersalliance.com)";
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {

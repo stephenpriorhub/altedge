@@ -3,12 +3,12 @@ import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AltEdge — Alternative Data Terminal",
+  title: "ShadowData — Alternative Data Terminal",
   description:
     "Search a ticker and pull real-time alternative data (hiring, OSS, app, web, patents, filings, chatter) to support an investment thesis.",
 };
 
-const HUB_PROJECT_ID = process.env.NEXT_PUBLIC_HUB_PROJECT_ID || "altedge";
+const HUB_PROJECT_ID = process.env.NEXT_PUBLIC_HUB_PROJECT_ID || "shadowdata";
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

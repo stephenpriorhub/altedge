@@ -11,7 +11,7 @@ export default function GlobalError({ error, reset }: { error: Error; reset: () 
     <html style={{ visibility: "visible" }}>
       <body style={{ fontFamily: "system-ui, sans-serif", background: "#0b1120", color: "#e2e8f0", padding: 24 }}>
         <div style={{ maxWidth: 640, margin: "60px auto", textAlign: "center" }}>
-          <h1 style={{ fontSize: 20, fontWeight: 600 }}>AltEdge failed to load</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 600 }}>ShadowData failed to load</h1>
           <p style={{ color: "#94a3b8", marginTop: 8, fontSize: 14 }}>{error?.message || "Unexpected error."}</p>
           <button
             onClick={reset}

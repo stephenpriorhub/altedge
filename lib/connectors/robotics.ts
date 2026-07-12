@@ -5,7 +5,7 @@
  * Atlas we surface its role (OEM vs component/AI/raw-material supplier), the actual
  * supply-chain edges (who it buys from / sells to, and for which component), robot specs
  * for OEMs, and funding/production — with each mapped counterparty deep-linked to its own
- * AltEdge profile when it's tradeable in the US.
+ * ShadowData profile when it's tradeable in the US.
  *
  * Zero new cost: the Atlas API is free and all list calls are cached 24h on the volume.
  * Matching is conservative (see lib/robotics-atlas.ts) so a symbol collision never attaches
@@ -16,7 +16,7 @@ import { result, type Connector, type DetailSection, type Metric } from "./types
 import {
   ATLAS_SITE,
   ROLE_LABEL,
-  altedgeTickerFor,
+  shadowdataTickerFor,
   cleanCompanyName,
   getAtlasCompanies,
   getAtlasProfile,
@@ -40,7 +40,7 @@ const fmtM = (m?: number | null): string | undefined => {
   return m >= 1_000_000 ? `$${(m / 1_000_000).toFixed(2)}T` : m >= 1000 ? `$${(m / 1000).toFixed(1)}B` : `$${m}M`;
 };
 
-/** Build a "counterparty" table where tradeable counterparties link to their AltEdge profile. */
+/** Build a "counterparty" table where tradeable counterparties link to their ShadowData profile. */
 function relationshipTable(
   title: string,
   rels: AtlasRelationship[],
@@ -51,7 +51,7 @@ function relationshipTable(
   const rows = rels.map((r) => {
     const node = r[side];
     const lite = companyById.get(node.id);
-    const altTicker = lite ? altedgeTickerFor(lite) : null;
+    const altTicker = lite ? shadowdataTickerFor(lite) : null;
     return {
       cells: [cleanCompanyName(node.name), r.component ?? "—", node.country ?? "—"],
       href: altTicker ? `/?ticker=${altTicker}` : undefined,
@@ -158,7 +158,7 @@ export const roboticsConnector: Connector = {
             customers,
             "to",
             companyById,
-            "Each row is a mapped supply relationship. Tradeable customers link to their AltEdge profile."
+            "Each row is a mapped supply relationship. Tradeable customers link to their ShadowData profile."
           )
         );
       if (suppliers.length)
@@ -168,7 +168,7 @@ export const roboticsConnector: Connector = {
             suppliers,
             "from",
             companyById,
-            "Who this OEM sources humanoid components from. Tradeable suppliers link to their AltEdge profile."
+            "Who this OEM sources humanoid components from. Tradeable suppliers link to their ShadowData profile."
           )
         );
 
@@ -195,7 +195,7 @@ export const roboticsConnector: Connector = {
         title: "Source",
         links: [
           { label: "Explore the Humanoid Atlas", url: ATLAS_SITE, sublabel: "Humanoids.FYI" },
-          { label: "AltEdge Robotics Watchlist", url: "/robotics", sublabel: "all publicly-traded robotics names" },
+          { label: "ShadowData Robotics Watchlist", url: "/robotics", sublabel: "all publicly-traded robotics names" },
         ],
       });
 
