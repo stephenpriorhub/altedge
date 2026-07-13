@@ -11,6 +11,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getJson, getText, classifyFailure } from "./http";
 import { getCached, setCached } from "../store";
+import { geocodePlace } from "../geocode";
 import { SYNTH_MODEL } from "../models";
 import { result, type Connector, type DetailSection, type Metric } from "./types";
 
@@ -18,9 +19,11 @@ const meta = { id: "realestate", label: "Real Estate / Properties", category: "r
 
 interface Facility {
   location: string;
-  address?: string;
+  placeQuery?: string; // LLM-proposed geocodable place name (NOT an address)
+  address?: string; // resolved from OSM only — never an LLM guess
   lat?: number;
   lng?: number;
+  geoSource?: "nominatim" | "photon"; // provenance of the address; absent = unresolved
   purpose: string;
   tenure: string; // owned | leased | mixed | unknown
   size?: string;
@@ -45,7 +48,7 @@ interface REData {
 const TOOL = {
   name: "emit_real_estate",
   description:
-    "Summarize a company's real-estate footprint. First identify its real facilities from the 10-K Properties text (owned vs leased, purpose, size). Then ENRICH each facility with its actual real-world street ADDRESS and WGS84 coordinates using your own knowledge of the company — this is expected and required, because 10-Ks almost never print street addresses. Prefer specific named sites (e.g. 'Gigafactory Texas', 'Fremont Factory') over vague regions, and give each a concrete address whenever you know it. Only leave an address blank if you genuinely don't know the site's location. Don't fabricate facilities that don't exist, but DO use outside knowledge for the addresses/coordinates of real ones. Also flag expansion/new-facility/land signals.",
+    "Summarize a company's real-estate footprint. Identify its real facilities from the 10-K Properties text (owned vs leased, purpose, size). For each facility, give a `placeQuery`: a specific, well-known NAME for the site that a map search engine can resolve (e.g. 'Tesla Gigafactory Texas', 'Apple Park Cupertino', 'Intel Fab 42 Chandler AZ'). DO NOT write out a street address or coordinates yourself — a downstream geocoder resolves the canonical address from the placeQuery, so a guessed address would only introduce errors. Prefer specific named sites over vague regions. Leave placeQuery blank only if the site is too generic to name (e.g. 'various leased offices'). Don't fabricate facilities that don't exist. Also flag expansion/new-facility/land signals.",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -57,9 +60,7 @@ const TOOL = {
           type: "object",
           properties: {
             location: { type: "string", description: "The location as described in the 10-K (city/region)." },
-            address: { type: "string", description: "Real street address of this facility from your knowledge of the company's actual sites. Fill this whenever you know the location (a city-level address is acceptable if you don't know the exact street). Leave blank only if truly unknown." },
-            lat: { type: "number", description: "Approximate WGS84 latitude, if known." },
-            lng: { type: "number", description: "Approximate WGS84 longitude, if known." },
+            placeQuery: { type: "string", description: "A specific, geocodable NAME for this site (e.g. 'Tesla Gigafactory Texas', 'Apple Park Cupertino'). NOT a street address — a geocoder resolves the real address from this name. Blank only if the site is too generic to name." },
             purpose: { type: "string", description: "e.g. manufacturing, R&D, data center, retail, HQ, warehouse" },
             tenure: { type: "string", enum: ["owned", "leased", "mixed", "unknown"] },
             size: { type: "string", description: "square footage / acreage if stated" },
@@ -117,7 +118,7 @@ export const realEstateConnector: Connector = {
     if (!entity.cik) return result(meta, { status: "not-applicable", note: "No SEC CIK — not an SEC registrant." });
     if (!process.env.ANTHROPIC_API_KEY) return result(meta, { status: "no-data", note: "Property summary requires ANTHROPIC_API_KEY.", tookMs: Date.now() - start });
     try {
-      let data = getCached<REData>("realestate3", entity.ticker, 1000 * 60 * 60 * 24 * 90);
+      let data = getCached<REData>("realestate4", entity.ticker, 1000 * 60 * 60 * 24 * 90);
       if (!data) {
         const filing = await latest10K(entity.cik, ctx.signal);
         if (!filing) return result(meta, { status: "no-data", note: "No 10-K on file (may be a foreign filer with 20-F).", tookMs: Date.now() - start });
@@ -135,7 +136,7 @@ export const realEstateConnector: Connector = {
             messages: [
               {
                 role: "user",
-                content: `Company: ${entity.companyName} (${entity.ticker}).\n\n10-K Item 2 Properties (source of which facilities exist):\n${section}\n\nList the company's real facilities from this text, then enrich EACH with its real street address and WGS84 lat/lng from your knowledge of ${entity.companyName}'s actual sites (HQ, plants, gigafactories, major offices, DCs). Fill the address field wherever you know the location.`,
+                content: `Company: ${entity.companyName} (${entity.ticker}).\n\n10-K Item 2 Properties (source of which facilities exist):\n${section}\n\nList the company's real facilities from this text. For each, give a specific geocodable placeQuery (a well-known site NAME like "Tesla Gigafactory Texas" or "Apple Park Cupertino") — do NOT write street addresses or coordinates; those are resolved downstream.`,
               },
             ],
           },
@@ -143,16 +144,32 @@ export const realEstateConnector: Connector = {
         );
         const tool = msg.content.find((b) => b.type === "tool_use");
         const out = (tool && "input" in tool ? tool.input : {}) as Partial<REData>;
+        const facilities = Array.isArray(out.facilities) ? out.facilities : [];
+        // Resolve each site's real address from OSM — never trust an LLM address.
+        for (const f of facilities) {
+          f.address = undefined;
+          f.lat = undefined;
+          f.lng = undefined;
+          f.geoSource = undefined;
+          if (!f.placeQuery) continue;
+          const geo = await geocodePlace(f.placeQuery, ctx.signal);
+          if (geo) {
+            f.address = geo.address;
+            f.lat = geo.lat;
+            f.lng = geo.lng;
+            f.geoSource = geo.source;
+          }
+        }
         data = {
           headquarters: out.headquarters ?? "—",
           ownershipSummary: out.ownershipSummary ?? "",
-          facilities: Array.isArray(out.facilities) ? out.facilities : [],
+          facilities,
           expansionSignals: Array.isArray(out.expansionSignals) ? out.expansionSignals : [],
           summary: out.summary ?? "",
           filingUrl: filing.url,
           filingDate: filing.date,
         };
-        if (data.facilities.length || data.summary) setCached("realestate3", entity.ticker, data);
+        if (data.facilities.length || data.summary) setCached("realestate4", entity.ticker, data);
       }
 
       const owned = data.facilities.filter((f) => f.tenure === "owned").length;
@@ -169,14 +186,14 @@ export const realEstateConnector: Connector = {
       if (data.facilities.length)
         detail.push({
           kind: "table",
-          title: "Facilities (from 10-K, addresses best-effort)",
+          title: "Facilities (from 10-K, addresses geocoded via OpenStreetMap)",
           columns: [{ label: "Location" }, { label: "Address" }, { label: "Purpose" }, { label: "Tenure" }, { label: "Size" }],
           rows: data.facilities.map((f) => ({
-            cells: [f.location, f.address ?? "—", f.purpose, f.tenure, f.size ?? "—"],
+            cells: [f.location, f.address ? `${f.address} ✓` : "— (unresolved)", f.purpose, f.tenure, f.size ?? "—"],
             href: mapsLink(f.lat, f.lng, f.address),
             hrefLabel: "🛰 View",
           })),
-          note: "10-Ks describe locations broadly; addresses/coordinates are best-known enrichments (reliable for HQs & major plants). Parcel-level ownership needs ATTOM/Regrid/Reonomy.",
+          note: "The 10-K names which facilities exist; each address is resolved from that site's name via OpenStreetMap (✓ = OSM-verified). Sites OSM can't resolve are left blank rather than guessed. Parcel-level ownership needs ATTOM/Regrid/Reonomy.",
         });
       if (data.expansionSignals.length)
         detail.push({ kind: "keyvals", title: "Expansion / new-facility signals", items: data.expansionSignals.map((s, i) => ({ label: `#${i + 1}`, value: s })) });

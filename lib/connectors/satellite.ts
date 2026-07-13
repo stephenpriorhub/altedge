@@ -11,6 +11,7 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { getCached, setCached } from "../store";
+import { geocodePlace } from "../geocode";
 import { SYNTH_MODEL } from "../models";
 import { result, type Connector, type DetailSection } from "./types";
 
@@ -18,9 +19,11 @@ const meta = { id: "satellite", label: "Satellite Imagery", category: "geo", tie
 
 interface Idea {
   target: string;
-  address: string;
+  placeQuery?: string; // LLM-proposed geocodable place name (NOT an address)
+  address?: string; // resolved from OSM only — never an LLM guess
   lat?: number;
   lng?: number;
+  geoSource?: "nominatim" | "photon"; // provenance; absent = unresolved
   observe: string;
   signal: string;
   cadence: string;
@@ -29,7 +32,7 @@ interface Idea {
 const IDEAS_TOOL = {
   name: "emit_satellite_ideas",
   description:
-    "Emit concrete, space-observable satellite-imagery analyses for this specific company. For each, name a REAL, specific site (its street address or best-known location) and its approximate WGS84 latitude/longitude, what to observe, what a change would signal, and the imaging cadence. Only include things genuinely visible from commercial satellite imagery (lot fill, construction, storage-tank levels, ship/rail/truck counts, crop/mine activity, flaring). If unsure of an exact address, give the best-known facility location and coordinates; never invent a precise street address you are not confident in.",
+    "Emit concrete, space-observable satellite-imagery analyses for this specific company. For each, name a REAL, specific site and provide a `placeQuery`: a well-known, geocodable NAME for that site (e.g. 'Tesla Fremont Factory', 'Port of Long Beach'). DO NOT write out a street address or coordinates yourself — a downstream geocoder resolves the canonical location from the placeQuery, and a guessed address would only aim imagery at the wrong place. Only include things genuinely visible from commercial satellite imagery (lot fill, construction, storage-tank levels, ship/rail/truck counts, crop/mine activity, flaring).",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -39,14 +42,12 @@ const IDEAS_TOOL = {
           type: "object",
           properties: {
             target: { type: "string", description: "The specific site/asset to image (e.g. 'Fremont Factory — vehicle outbound lots')." },
-            address: { type: "string", description: "Real address or best-known location string for that site." },
-            lat: { type: "number", description: "Approximate WGS84 latitude of the site." },
-            lng: { type: "number", description: "Approximate WGS84 longitude of the site." },
+            placeQuery: { type: "string", description: "A specific, geocodable NAME for the site (e.g. 'Tesla Fremont Factory'). NOT a street address — a geocoder resolves the real location from this name." },
             observe: { type: "string", description: "The measurable feature to track over time." },
             signal: { type: "string", description: "What a change would imply for revenue/production/demand." },
             cadence: { type: "string", description: "How often to image (e.g., weekly, monthly)." },
           },
-          required: ["target", "address", "observe", "signal", "cadence"],
+          required: ["target", "placeQuery", "observe", "signal", "cadence"],
         },
       },
       overview: { type: "string", description: "1-2 sentences on how useful satellite is for THIS company and its biggest caveats." },
@@ -73,7 +74,7 @@ export const satelliteConnector: Connector = {
       return result(meta, { status: "no-data", note: "Satellite analysis ideas require ANTHROPIC_API_KEY.", tookMs: Date.now() - start });
     }
     try {
-      let payload = getCached<{ ideas: Idea[]; overview: string }>("satellite2", entity.ticker, 1000 * 60 * 60 * 24 * 30);
+      let payload = getCached<{ ideas: Idea[]; overview: string }>("satellite3", entity.ticker, 1000 * 60 * 60 * 24 * 30);
       if (!payload) {
         const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
         const msg = await client.messages.create(
@@ -85,7 +86,7 @@ export const satelliteConnector: Connector = {
             messages: [
               {
                 role: "user",
-                content: `Company: ${entity.companyName} (${entity.ticker}). Sector: ${entity.sector ?? "unknown"}. ${entity.description?.slice(0, 400) ?? ""}\n\nPropose satellite-imagery analyses specific to this company's real facilities, each with a site address + coordinates.`,
+                content: `Company: ${entity.companyName} (${entity.ticker}). Sector: ${entity.sector ?? "unknown"}. ${entity.description?.slice(0, 400) ?? ""}\n\nPropose satellite-imagery analyses specific to this company's real facilities. For each, give a specific geocodable placeQuery (a well-known site NAME like "Tesla Fremont Factory") — do NOT write addresses or coordinates; those are resolved downstream.`,
               },
             ],
           },
@@ -93,8 +94,24 @@ export const satelliteConnector: Connector = {
         );
         const tool = msg.content.find((b) => b.type === "tool_use");
         const input = (tool && "input" in tool ? tool.input : {}) as { ideas?: Idea[]; overview?: string };
-        payload = { ideas: Array.isArray(input.ideas) ? input.ideas : [], overview: input.overview ?? "" };
-        if (payload.ideas.length) setCached("satellite2", entity.ticker, payload);
+        const ideas = Array.isArray(input.ideas) ? input.ideas : [];
+        // Resolve each site's real location from OSM — never trust an LLM address.
+        for (const i of ideas) {
+          i.address = undefined;
+          i.lat = undefined;
+          i.lng = undefined;
+          i.geoSource = undefined;
+          if (!i.placeQuery) continue;
+          const geo = await geocodePlace(i.placeQuery, ctx.signal);
+          if (geo) {
+            i.address = geo.address;
+            i.lat = geo.lat;
+            i.lng = geo.lng;
+            i.geoSource = geo.source;
+          }
+        }
+        payload = { ideas, overview: input.overview ?? "" };
+        if (payload.ideas.length) setCached("satellite3", entity.ticker, payload);
       }
       if (!payload.ideas.length) {
         return result(meta, { status: "no-data", note: "Could not derive satellite analyses for this company.", tookMs: Date.now() - start });
@@ -116,12 +133,14 @@ export const satelliteConnector: Connector = {
           columns: [{ label: "Site (click to view)" }, { label: "Observe" }, { label: "Signal" }, { label: "Cadence" }],
           rows: payload.ideas.map((i) => ({
             cells: [
-              `${i.target} — ${i.address}${i.lat != null && i.lng != null ? ` (${i.lat.toFixed(3)}, ${i.lng.toFixed(3)})` : ""}`,
+              i.address
+                ? `${i.target} — ${i.address} ✓${i.lat != null && i.lng != null ? ` (${i.lat.toFixed(3)}, ${i.lng.toFixed(3)})` : ""}`
+                : `${i.target} — location unresolved`,
               i.observe,
               i.signal,
               i.cadence,
             ],
-            href: mapsLink(i.lat, i.lng, i.address),
+            href: mapsLink(i.lat, i.lng, i.address ?? i.placeQuery),
             hrefLabel: "🛰 View site",
           })),
           note: payload.overview,
@@ -144,7 +163,7 @@ export const satelliteConnector: Connector = {
           { name: "Sites located", value: payload.ideas.filter((i) => i.lat != null).length },
           { name: "Imagery", value: planetReady ? "Planet ✓" : "not set" },
         ],
-        evidence: payload.ideas.slice(0, 3).map((i) => ({ summary: `${i.target} — ${i.address}`, url: mapsLink(i.lat, i.lng, i.address) })),
+        evidence: payload.ideas.slice(0, 3).map((i) => ({ summary: `${i.target}${i.address ? ` — ${i.address}` : ""}`, url: mapsLink(i.lat, i.lng, i.address ?? i.placeQuery) })),
         detail,
         tookMs: Date.now() - start,
       });
